@@ -154,10 +154,6 @@ a {
   text-align: right;
 }
 
-.terminal-audio {
-  display: none;
-}
-
 .online-dot {
   display: inline-block;
   width: 0.48em;

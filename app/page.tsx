@@ -114,6 +114,56 @@ const TERMINAL_AUDIO_MAX_VOLUME_PERCENT = 25;
 const TERMINAL_AUDIO_MUTED_PREFERENCE = 'v01df0rg3-terminal-audio-muted';
 const TERMINAL_AUDIO_VOLUME_PREFERENCE = 'v01df0rg3-terminal-audio-volume';
 
+function trimAudioPadding(buffer: AudioBuffer, context: BaseAudioContext) {
+  const threshold = 0.0005;
+  const scanWindow = Math.max(1, Math.floor(buffer.sampleRate * 0.01));
+
+  function peakBetween(start: number, end: number) {
+    let peak = 0;
+    for (let channel = 0; channel < buffer.numberOfChannels; channel += 1) {
+      const samples = buffer.getChannelData(channel);
+      for (let index = start; index < end; index += 1) {
+        peak = Math.max(peak, Math.abs(samples[index]));
+      }
+    }
+    return peak;
+  }
+
+  let start = 0;
+  while (
+    start + scanWindow < buffer.length &&
+    peakBetween(start, start + scanWindow) < threshold
+  ) {
+    start += scanWindow;
+  }
+
+  let end = buffer.length;
+  while (
+    end - scanWindow > start &&
+    peakBetween(end - scanWindow, end) < threshold
+  ) {
+    end -= scanWindow;
+  }
+
+  if (start === 0 && end === buffer.length) {
+    return buffer;
+  }
+
+  const trimmed = context.createBuffer(
+    buffer.numberOfChannels,
+    Math.max(1, end - start),
+    buffer.sampleRate,
+  );
+  for (let channel = 0; channel < buffer.numberOfChannels; channel += 1) {
+    trimmed.copyToChannel(
+      buffer.getChannelData(channel).subarray(start, end),
+      channel,
+      0,
+    );
+  }
+  return trimmed;
+}
+
 const INITIAL_TRANSCRIPT: TranscriptEntry[] = [
   {
     id: 0,
@@ -649,7 +699,12 @@ export default function Home() {
     'waiting',
   );
   const inputRef = useRef<HTMLInputElement>(null);
-  const audioRef = useRef<HTMLAudioElement>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const gainRef = useRef<GainNode | null>(null);
+  const sourceRef = useRef<AudioBufferSourceNode | null>(null);
+  const startPlaybackRef = useRef<(() => Promise<void>) | null>(null);
+  const isMutedRef = useRef(false);
+  const volumePercentRef = useRef(TERMINAL_AUDIO_DEFAULT_VOLUME_PERCENT);
   const endRef = useRef<HTMLDivElement>(null);
   const nextId = useRef(2);
   const sessionStart = useRef(Date.now());
@@ -662,8 +717,11 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    const audio = audioRef.current;
-    if (!audio) {
+    const AudioContextClass =
+      window.AudioContext ??
+      (window as Window & { webkitAudioContext?: typeof AudioContext })
+        .webkitAudioContext;
+    if (!AudioContextClass) {
       return;
     }
 
@@ -687,67 +745,111 @@ export default function Home() {
     }
 
     const initiallyMuted = savedMuted || savedVolumePercent === 0;
-    audio.volume = savedVolumePercent / 100;
-    audio.muted = initiallyMuted;
+    isMutedRef.current = initiallyMuted;
+    volumePercentRef.current = savedVolumePercent;
     setVolumePercent(savedVolumePercent);
     setIsMuted(initiallyMuted);
 
-    if (initiallyMuted) {
-      setAudioStatus('muted');
+    let cancelled = false;
+    let decodedBuffer: AudioBuffer | null = null;
+    let onGesture = () => undefined;
+    const gestureEvents: Array<keyof WindowEventMap> = ['pointerdown', 'keydown', 'touchstart'];
+
+    let context: AudioContext;
+    let gain: GainNode;
+    try {
+      context = new AudioContextClass();
+      gain = context.createGain();
+    } catch {
       return;
     }
 
-    let cancelled = false;
-    const gestureEvents: Array<keyof WindowEventMap> = [
-      'pointerdown',
-      'keydown',
-      'touchstart',
-    ];
-
-    let tryStart = () => undefined;
+    audioContextRef.current = context;
+    gainRef.current = gain;
+    gain.gain.value = initiallyMuted ? 0 : savedVolumePercent / 100;
+    gain.connect(context.destination);
 
     const removeGestureListeners = () => {
       gestureEvents.forEach((eventName) => {
-        window.removeEventListener(eventName, tryStart);
+        window.removeEventListener(eventName, onGesture);
       });
     };
 
-    tryStart = () => {
-      if (audio.muted) {
+    const startPlayback = async () => {
+      if (cancelled || isMutedRef.current || sourceRef.current) {
         return;
       }
 
-      audio.muted = false;
-      const playAttempt = audio.play();
+      try {
+        if (context.state !== 'running') {
+          await context.resume();
+        }
+        if (cancelled || isMutedRef.current || sourceRef.current || !decodedBuffer) {
+          return;
+        }
 
-      if (!playAttempt) {
+        const source = context.createBufferSource();
+        source.buffer = decodedBuffer;
+        source.loop = true;
+        source.loopStart = 0;
+        source.loopEnd = decodedBuffer.duration;
+        source.connect(gain);
+        source.start(0);
+        sourceRef.current = source;
         setAudioStatus('playing');
         removeGestureListeners();
-        return;
+      } catch {
+        if (!cancelled) {
+          setAudioStatus('waiting');
+        }
       }
-
-      playAttempt
-        .then(() => {
-          if (!cancelled && !audio.muted) {
-            setAudioStatus('playing');
-            removeGestureListeners();
-          }
-        })
-        .catch(() => {
-          if (!cancelled) {
-            setAudioStatus('waiting');
-          }
-        });
     };
 
+    startPlaybackRef.current = startPlayback;
+    onGesture = () => {
+      void startPlayback();
+    };
     gestureEvents.forEach((eventName) => {
-      window.addEventListener(eventName, tryStart, { passive: eventName !== 'keydown' });
+      window.addEventListener(eventName, onGesture, { passive: eventName !== 'keydown' });
     });
-    tryStart();
+    if (initiallyMuted) {
+      setAudioStatus('muted');
+    }
+
+    fetch(TERMINAL_AUDIO_SRC, { cache: 'force-cache' })
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error('audio request failed');
+        }
+        return response.arrayBuffer();
+      })
+      .then((data) => context.decodeAudioData(data))
+      .then((decoded) => {
+        if (cancelled) {
+          return;
+        }
+        decodedBuffer = trimAudioPadding(decoded, context);
+        if (!isMutedRef.current) {
+          void startPlayback();
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setAudioStatus('waiting');
+        }
+      });
 
     return () => {
       cancelled = true;
       removeGestureListeners();
+      startPlaybackRef.current = null;
+      sourceRef.current?.stop();
+      sourceRef.current?.disconnect();
+      sourceRef.current = null;
+      gain.disconnect();
+      void context.close();
+      audioContextRef.current = null;
+      gainRef.current = null;
     };
   }, []);
 
@@ -1162,8 +1264,17 @@ export default function Home() {
     }
   }
 
+  function setAudioGain(value: number) {
+    const gain = gainRef.current;
+    const context = audioContextRef.current;
+    if (gain && context) {
+      gain.gain.setTargetAtTime(value, context.currentTime, 0.015);
+    }
+  }
+
   function toggleAudio() {
     const nextMuted = !isMuted;
+    isMutedRef.current = nextMuted;
     setIsMuted(nextMuted);
 
     try {
@@ -1172,20 +1283,16 @@ export default function Home() {
       // Audio still works when storage is unavailable (for example, private mode).
     }
 
-    const audio = audioRef.current;
-    if (!audio) {
-      return;
-    }
-
-    audio.muted = nextMuted;
     if (nextMuted) {
+      setAudioGain(0);
       setAudioStatus('muted');
       return;
     }
 
-    let nextVolumePercent = volumePercent;
+    let nextVolumePercent = volumePercentRef.current;
     if (nextVolumePercent === 0) {
       nextVolumePercent = TERMINAL_AUDIO_DEFAULT_VOLUME_PERCENT;
+      volumePercentRef.current = nextVolumePercent;
       setVolumePercent(nextVolumePercent);
       try {
         window.localStorage.setItem(
@@ -1197,20 +1304,17 @@ export default function Home() {
       }
     }
 
-    audio.volume = nextVolumePercent / 100;
-    const playAttempt = audio.play();
-    if (!playAttempt) {
+    setAudioGain(nextVolumePercent / 100);
+    if (sourceRef.current) {
       setAudioStatus('playing');
       return;
     }
 
-    playAttempt
-      .then(() => {
-        if (!audio.muted) {
-          setAudioStatus('playing');
-        }
-      })
-      .catch(() => setAudioStatus('waiting'));
+    if (startPlaybackRef.current) {
+      void startPlaybackRef.current();
+    } else {
+      setAudioStatus('waiting');
+    }
   }
 
   function updateAudioVolume(rawValue: string) {
@@ -1218,6 +1322,7 @@ export default function Home() {
       TERMINAL_AUDIO_MAX_VOLUME_PERCENT,
       Math.max(0, Number.parseInt(rawValue, 10) || 0),
     );
+    volumePercentRef.current = nextVolumePercent;
     setVolumePercent(nextVolumePercent);
 
     try {
@@ -1229,15 +1334,10 @@ export default function Home() {
       // Audio still works when storage is unavailable (for example, private mode).
     }
 
-    const audio = audioRef.current;
-    if (!audio) {
-      return;
-    }
-
-    audio.volume = nextVolumePercent / 100;
     if (nextVolumePercent === 0) {
-      audio.muted = true;
+      isMutedRef.current = true;
       setIsMuted(true);
+      setAudioGain(0);
       setAudioStatus('muted');
       try {
         window.localStorage.setItem(TERMINAL_AUDIO_MUTED_PREFERENCE, 'true');
@@ -1247,25 +1347,23 @@ export default function Home() {
       return;
     }
 
-    if (isMuted) {
-      audio.muted = true;
+    if (isMutedRef.current) {
+      setAudioGain(0);
       setAudioStatus('muted');
       return;
     }
 
-    audio.muted = false;
-    const playAttempt = audio.play();
-    if (!playAttempt) {
+    setAudioGain(nextVolumePercent / 100);
+    if (sourceRef.current) {
       setAudioStatus('playing');
       return;
     }
-    playAttempt
-      .then(() => {
-        if (!audio.muted) {
-          setAudioStatus('playing');
-        }
-      })
-      .catch(() => setAudioStatus('waiting'));
+
+    if (startPlaybackRef.current) {
+      void startPlaybackRef.current();
+    } else {
+      setAudioStatus('waiting');
+    }
   }
 
   function renderBlock(block: OutputBlock, key: string) {
@@ -1367,15 +1465,6 @@ export default function Home() {
       aria-label="v01df0rg3 terminal portfolio"
       onClick={focusInput}
     >
-      <audio
-        ref={audioRef}
-        className="terminal-audio"
-        src={TERMINAL_AUDIO_SRC}
-        loop
-        preload="auto"
-        aria-hidden="true"
-      />
-
       <header className="terminal__topline">
         <span>v01df0rg3@void</span>
         <div className="terminal__topline-right">
