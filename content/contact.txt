@@ -1,0 +1,8 @@
+contact
+-------
+
+The public contact point for this site is GitHub only.
+
+Run: open github
+
+No email address or contact form is stored here.

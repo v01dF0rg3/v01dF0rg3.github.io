@@ -1,0 +1,16 @@
+{
+  "name": "v01df0rg3 | terminal",
+  "short_name": "v01df0rg3",
+  "description": "A terminal-style portfolio.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#030604",
+  "theme_color": "#030604",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}
