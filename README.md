@@ -25,7 +25,11 @@ Editable content lives in:
     ├── blog/
     │   └── boot-sequence.md
     └── projects/
+        ├── session-sentinel.md
         └── terminal-portfolio.md
+
+The profile README source is available from the virtual filesystem at
+`links/profile-readme.url`.
 
 Register additional files in app/content.ts so they appear in the virtual
 filesystem.

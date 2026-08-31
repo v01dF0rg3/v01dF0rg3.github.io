@@ -3,6 +3,8 @@ v01df0rg3
 
 A personal corner of the web for projects, notes, and experiments.
 
+Security research, web apps, CTFs, hardware, robotics, and AI.
+
 This terminal is the interface. It behaves like a shell, but nothing here is
 connected to a real machine. Explore with ls, cd, and cat.
 

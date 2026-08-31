@@ -1,9 +1,9 @@
 :root {
   color-scheme: dark;
-  --void: #030604;
-  --surface: #070b08;
-  --surface-strong: #0a100c;
-  --line: #1b2a21;
+  --void: #000000;
+  --surface: #050505;
+  --surface-strong: #080808;
+  --line: #1a1f1b;
   --text: #d6ded8;
   --muted: #7f8d84;
   --green: #7ee787;
@@ -21,7 +21,7 @@
 html {
   min-height: 100%;
   background: var(--void);
-  scrollbar-color: #26392d var(--void);
+  scrollbar-color: #242424 var(--void);
 }
 
 body {
@@ -54,10 +54,7 @@ a {
   position: relative;
   min-height: 100dvh;
   overflow-x: hidden;
-  background:
-    radial-gradient(circle at 28% -10%, rgb(64 139 86 / 8%), transparent 35%),
-    radial-gradient(circle at 100% 85%, rgb(86 212 221 / 4%), transparent 26%),
-    var(--void);
+  background: var(--void);
 }
 
 .terminal::after {
@@ -84,7 +81,7 @@ a {
   gap: 24px;
   padding: 7px clamp(14px, 2.5vw, 32px);
   border-bottom: 1px solid var(--line);
-  background: rgb(3 6 4 / 88%);
+  background: rgb(0 0 0 / 92%);
   color: var(--muted);
   font-size: 0.72rem;
   letter-spacing: 0.08em;
@@ -478,7 +475,7 @@ a {
   overflow-x: auto;
   padding: 10px 12px max(10px, env(safe-area-inset-bottom));
   border-top: 1px solid var(--line);
-  background: rgb(3 6 4 / 94%);
+  background: rgb(0 0 0 / 96%);
   scrollbar-width: none;
   backdrop-filter: blur(14px);
 }
@@ -490,7 +487,7 @@ a {
 .quick-commands button {
   flex: 0 0 auto;
   padding: 6px 10px;
-  border: 1px solid #26392d;
+  border: 1px solid #242424;
   border-radius: 3px;
   background: var(--surface);
   color: var(--muted);

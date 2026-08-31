@@ -1,6 +1,7 @@
 import about from '../content/about.txt?raw';
 import contact from '../content/contact.txt?raw';
 import bootSequence from '../content/blog/boot-sequence.md?raw';
+import sessionSentinel from '../content/projects/session-sentinel.md?raw';
 import terminalPortfolio from '../content/projects/terminal-portfolio.md?raw';
 
 export const HOME = '/home/v01df0rg3';
@@ -28,7 +29,7 @@ export const directories: Record<string, DirectoryEntry> = {
   },
   [`${HOME}/projects`]: {
     type: 'directory',
-    children: ['README.md', 'terminal-portfolio.md'],
+    children: ['README.md', 'session-sentinel.md', 'terminal-portfolio.md'],
   },
   [`${HOME}/blog`]: {
     type: 'directory',
@@ -36,7 +37,7 @@ export const directories: Record<string, DirectoryEntry> = {
   },
   [`${HOME}/links`]: {
     type: 'directory',
-    children: ['github.url'],
+    children: ['github.url', 'profile-readme.url'],
   },
 };
 
@@ -57,8 +58,14 @@ export const files: Record<string, FileEntry> = {
     type: 'file',
     format: 'markdown',
     content:
-      '# projects\n\nExperiments and things built by `v01df0rg3`.\n\nUse `cat <file>` to inspect a project.',
+      '# projects\n\nPublic builds and experiments from the `v01df0rg3` lab.\n\n- `session-sentinel.md` — a privacy-first browser session cleanup extension\n- `terminal-portfolio.md` — this terminal interface\n\nUse `cat <file>` to inspect a project.',
     description: 'project directory guide',
+  },
+  [`${HOME}/projects/session-sentinel.md`]: {
+    type: 'file',
+    format: 'markdown',
+    content: sessionSentinel,
+    description: 'privacy-first Chrome session cleanup extension',
   },
   [`${HOME}/projects/terminal-portfolio.md`]: {
     type: 'file',
@@ -84,5 +91,11 @@ export const files: Record<string, FileEntry> = {
     format: 'link',
     content: 'https://github.com/v01dF0rg3',
     description: 'GitHub profile',
+  },
+  [`${HOME}/links/profile-readme.url`]: {
+    type: 'file',
+    format: 'link',
+    content: 'https://github.com/v01dF0rg3/v01dF0rg3',
+    description: 'profile README source',
   },
 };
