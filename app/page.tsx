@@ -108,6 +108,12 @@ const VIRTUAL_GIT_LOG = [
   'HEAD~2   Build the terminal portfolio foundation',
 ].join('\n');
 
+const TERMINAL_AUDIO_SRC = '/audio/terminal-loop.mp3';
+const TERMINAL_AUDIO_DEFAULT_VOLUME_PERCENT = 12;
+const TERMINAL_AUDIO_MAX_VOLUME_PERCENT = 25;
+const TERMINAL_AUDIO_MUTED_PREFERENCE = 'v01df0rg3-terminal-audio-muted';
+const TERMINAL_AUDIO_VOLUME_PREFERENCE = 'v01df0rg3-terminal-audio-volume';
+
 const INITIAL_TRANSCRIPT: TranscriptEntry[] = [
   {
     id: 0,
@@ -635,7 +641,15 @@ export default function Home() {
   const [commandLog, setCommandLog] = useState<string[]>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
   const [uptime, setUptime] = useState('00:00:00');
+  const [isMuted, setIsMuted] = useState(false);
+  const [volumePercent, setVolumePercent] = useState(
+    TERMINAL_AUDIO_DEFAULT_VOLUME_PERCENT,
+  );
+  const [audioStatus, setAudioStatus] = useState<'playing' | 'muted' | 'waiting'>(
+    'waiting',
+  );
   const inputRef = useRef<HTMLInputElement>(null);
+  const audioRef = useRef<HTMLAudioElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
   const nextId = useRef(2);
   const sessionStart = useRef(Date.now());
@@ -645,6 +659,96 @@ export default function Home() {
       setUptime(formatUptime(Math.floor((Date.now() - sessionStart.current) / 1000)));
     }, 1000);
     return () => window.clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) {
+      return;
+    }
+
+    let savedMuted = false;
+    let savedVolumePercent = TERMINAL_AUDIO_DEFAULT_VOLUME_PERCENT;
+    try {
+      savedMuted =
+        window.localStorage.getItem(TERMINAL_AUDIO_MUTED_PREFERENCE) === 'true';
+      const storedVolume = Number.parseInt(
+        window.localStorage.getItem(TERMINAL_AUDIO_VOLUME_PREFERENCE) ?? '',
+        10,
+      );
+      if (Number.isFinite(storedVolume)) {
+        savedVolumePercent = Math.min(
+          TERMINAL_AUDIO_MAX_VOLUME_PERCENT,
+          Math.max(0, storedVolume),
+        );
+      }
+    } catch {
+      savedMuted = false;
+    }
+
+    const initiallyMuted = savedMuted || savedVolumePercent === 0;
+    audio.volume = savedVolumePercent / 100;
+    audio.muted = initiallyMuted;
+    setVolumePercent(savedVolumePercent);
+    setIsMuted(initiallyMuted);
+
+    if (initiallyMuted) {
+      setAudioStatus('muted');
+      return;
+    }
+
+    let cancelled = false;
+    const gestureEvents: Array<keyof WindowEventMap> = [
+      'pointerdown',
+      'keydown',
+      'touchstart',
+    ];
+
+    let tryStart = () => undefined;
+
+    const removeGestureListeners = () => {
+      gestureEvents.forEach((eventName) => {
+        window.removeEventListener(eventName, tryStart);
+      });
+    };
+
+    tryStart = () => {
+      if (audio.muted) {
+        return;
+      }
+
+      audio.muted = false;
+      const playAttempt = audio.play();
+
+      if (!playAttempt) {
+        setAudioStatus('playing');
+        removeGestureListeners();
+        return;
+      }
+
+      playAttempt
+        .then(() => {
+          if (!cancelled && !audio.muted) {
+            setAudioStatus('playing');
+            removeGestureListeners();
+          }
+        })
+        .catch(() => {
+          if (!cancelled) {
+            setAudioStatus('waiting');
+          }
+        });
+    };
+
+    gestureEvents.forEach((eventName) => {
+      window.addEventListener(eventName, tryStart, { passive: eventName !== 'keydown' });
+    });
+    tryStart();
+
+    return () => {
+      cancelled = true;
+      removeGestureListeners();
+    };
   }, []);
 
   useEffect(() => {
@@ -1058,6 +1162,112 @@ export default function Home() {
     }
   }
 
+  function toggleAudio() {
+    const nextMuted = !isMuted;
+    setIsMuted(nextMuted);
+
+    try {
+      window.localStorage.setItem(TERMINAL_AUDIO_MUTED_PREFERENCE, String(nextMuted));
+    } catch {
+      // Audio still works when storage is unavailable (for example, private mode).
+    }
+
+    const audio = audioRef.current;
+    if (!audio) {
+      return;
+    }
+
+    audio.muted = nextMuted;
+    if (nextMuted) {
+      setAudioStatus('muted');
+      return;
+    }
+
+    let nextVolumePercent = volumePercent;
+    if (nextVolumePercent === 0) {
+      nextVolumePercent = TERMINAL_AUDIO_DEFAULT_VOLUME_PERCENT;
+      setVolumePercent(nextVolumePercent);
+      try {
+        window.localStorage.setItem(
+          TERMINAL_AUDIO_VOLUME_PREFERENCE,
+          String(nextVolumePercent),
+        );
+      } catch {
+        // Audio still works when storage is unavailable (for example, private mode).
+      }
+    }
+
+    audio.volume = nextVolumePercent / 100;
+    const playAttempt = audio.play();
+    if (!playAttempt) {
+      setAudioStatus('playing');
+      return;
+    }
+
+    playAttempt
+      .then(() => {
+        if (!audio.muted) {
+          setAudioStatus('playing');
+        }
+      })
+      .catch(() => setAudioStatus('waiting'));
+  }
+
+  function updateAudioVolume(rawValue: string) {
+    const nextVolumePercent = Math.min(
+      TERMINAL_AUDIO_MAX_VOLUME_PERCENT,
+      Math.max(0, Number.parseInt(rawValue, 10) || 0),
+    );
+    setVolumePercent(nextVolumePercent);
+
+    try {
+      window.localStorage.setItem(
+        TERMINAL_AUDIO_VOLUME_PREFERENCE,
+        String(nextVolumePercent),
+      );
+    } catch {
+      // Audio still works when storage is unavailable (for example, private mode).
+    }
+
+    const audio = audioRef.current;
+    if (!audio) {
+      return;
+    }
+
+    audio.volume = nextVolumePercent / 100;
+    if (nextVolumePercent === 0) {
+      audio.muted = true;
+      setIsMuted(true);
+      setAudioStatus('muted');
+      try {
+        window.localStorage.setItem(TERMINAL_AUDIO_MUTED_PREFERENCE, 'true');
+      } catch {
+        // Audio still works when storage is unavailable (for example, private mode).
+      }
+      return;
+    }
+
+    if (isMuted) {
+      audio.muted = true;
+      setAudioStatus('muted');
+      return;
+    }
+
+    audio.muted = false;
+    const playAttempt = audio.play();
+    if (!playAttempt) {
+      setAudioStatus('playing');
+      return;
+    }
+    playAttempt
+      .then(() => {
+        if (!audio.muted) {
+          setAudioStatus('playing');
+        }
+      })
+      .catch(() => setAudioStatus('waiting'));
+  }
+
   function renderBlock(block: OutputBlock, key: string) {
     if (block.kind === 'fastfetch') {
       return <Fastfetch key={key} uptime={uptime} />;
@@ -1157,12 +1367,57 @@ export default function Home() {
       aria-label="v01df0rg3 terminal portfolio"
       onClick={focusInput}
     >
-      <div className="terminal__topline" aria-hidden="true">
+      <audio
+        ref={audioRef}
+        className="terminal-audio"
+        src={TERMINAL_AUDIO_SRC}
+        loop
+        preload="auto"
+        aria-hidden="true"
+      />
+
+      <header className="terminal__topline">
         <span>v01df0rg3@void</span>
-        <span>
-          zsh-web <i className="online-dot" /> online
-        </span>
-      </div>
+        <div className="terminal__topline-right">
+          <span>
+            zsh-web <i className="online-dot" /> online
+          </span>
+          <div className="audio-controls" role="group" aria-label="Background audio controls">
+            <span className="audio-state" aria-live="polite">
+              {isMuted
+                ? 'sound: muted'
+                : audioStatus === 'waiting'
+                  ? 'sound: ready'
+                  : 'sound: on'}
+            </span>
+            <button
+              className="audio-toggle"
+              type="button"
+              onClick={toggleAudio}
+              aria-pressed={isMuted}
+              aria-label={isMuted ? 'Unmute background music' : 'Mute background music'}
+              title="Mute or unmute the background loop"
+            >
+              {isMuted ? 'unmute' : 'mute'}
+            </button>
+            <label className="audio-volume">
+              <span className="audio-volume__label">vol</span>
+              <input
+                type="range"
+                min="0"
+                max={TERMINAL_AUDIO_MAX_VOLUME_PERCENT}
+                step="1"
+                value={volumePercent}
+                onChange={(event) => updateAudioVolume(event.target.value)}
+                aria-label={`Background music volume ${volumePercent}%`}
+              />
+              <span className="audio-volume__value" aria-hidden="true">
+                {volumePercent}%
+              </span>
+            </label>
+          </div>
+        </div>
+      </header>
 
       <section className="terminal__scroll" aria-live="polite">
         {transcript.map((entry) => (

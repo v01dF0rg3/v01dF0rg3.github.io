@@ -37,6 +37,12 @@ The profile README source is available from the virtual filesystem at
 
 The static RSS feed is available at `https://v01df0rg3.github.io/feed.xml`.
 
+The welcome screen includes a loopable background track at a restrained 12% volume.
+Use the `sound` control in the top bar to mute or resume it; the preference stays
+local to the current browser. The track is bundled at
+`public/audio/terminal-loop.mp3`; browsers that block autoplay start it after the
+first interaction.
+
 Register additional files in app/content.ts so they appear in the virtual
 filesystem.
 
