@@ -7,6 +7,9 @@ export const metadata: Metadata = {
   metadataBase: new URL('https://v01df0rg3.github.io'),
   alternates: {
     canonical: '/',
+    types: {
+      'application/rss+xml': '/feed.xml',
+    },
   },
   icons: {
     icon: '/favicon.svg',

@@ -1,0 +1,9 @@
+current focus
+-------------
+
+session-sentinel — hardening a privacy-first browser extension.
+
+terminal portfolio — documenting the work in public and keeping the interface
+fast, static, and privacy-first.
+
+Next: more experiments, build notes, and projects as they become public.

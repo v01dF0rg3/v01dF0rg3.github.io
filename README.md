@@ -3,8 +3,8 @@
 A privacy-first terminal portfolio for v01df0rg3.
 
 The interface behaves like a small zsh-inspired filesystem. Visitors can use
-commands such as ls, cd, cat, help, history, and fastfetch to move through
-projects and Markdown posts.
+commands such as ls, cd, cat, help, history, git log, and fastfetch to move
+through projects and Markdown posts.
 
 ## Local development
 
@@ -22,15 +22,20 @@ Editable content lives in:
 
     content/
     ├── about.txt
+    ├── now.txt
     ├── contact.txt
     ├── blog/
-    │   └── boot-sequence.md
+    │   ├── boot-sequence.md
+    │   ├── session-sentinel-build-log.md
+    │   └── terminal-interface.md
     └── projects/
         ├── session-sentinel.md
         └── terminal-portfolio.md
 
 The profile README source is available from the virtual filesystem at
 `links/profile-readme.url`.
+
+The static RSS feed is available at `https://v01df0rg3.github.io/feed.xml`.
 
 Register additional files in app/content.ts so they appear in the virtual
 filesystem.

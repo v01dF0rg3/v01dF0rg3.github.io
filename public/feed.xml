@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>v01df0rg3 // terminal notes</title>
+    <link>https://v01df0rg3.github.io/</link>
+    <description>Build notes and experiments from the v01df0rg3 lab.</description>
+    <language>en-us</language>
+    <item>
+      <title>Why this portfolio is a terminal</title>
+      <link>https://v01df0rg3.github.io/#/home/v01df0rg3/blog/terminal-interface.md</link>
+      <guid isPermaLink="false">v01df0rg3:terminal-interface</guid>
+      <description>Why the portfolio uses a static, shell-like virtual filesystem.</description>
+      <pubDate>Mon, 31 Aug 2026 00:00:00 GMT</pubDate>
+    </item>
+    <item>
+      <title>Session Sentinel: an honest logout tool</title>
+      <link>https://v01df0rg3.github.io/#/home/v01df0rg3/blog/session-sentinel-build-log.md</link>
+      <guid isPermaLink="false">v01df0rg3:session-sentinel-build-log</guid>
+      <description>Notes on making browser session cleanup report what it actually did.</description>
+      <pubDate>Mon, 31 Aug 2026 00:00:00 GMT</pubDate>
+    </item>
+    <item>
+      <title>Boot sequence</title>
+      <link>https://v01df0rg3.github.io/#/home/v01df0rg3/blog/boot-sequence.md</link>
+      <guid isPermaLink="false">v01df0rg3:boot-sequence</guid>
+      <description>The first note from the terminal portfolio.</description>
+      <pubDate>Mon, 31 Aug 2026 00:00:00 GMT</pubDate>
+    </item>
+  </channel>
+</rss>

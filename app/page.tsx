@@ -47,9 +47,11 @@ const COMMAND_HELP: HelpEntry[] = [
   { command: 'pwd', description: 'print the current directory' },
   { command: 'tree [path]', description: 'draw the virtual filesystem' },
   { command: 'whoami', description: 'print the active user' },
+  { command: 'now', description: 'show the current focus' },
   { command: 'fastfetch', description: 'show the system card' },
   { command: 'history', description: 'show commands from this session' },
-  { command: 'open github', description: 'open the GitHub profile' },
+  { command: 'git log', description: 'show the local build history' },
+  { command: 'open <target>', description: 'open a public link' },
   { command: 'date', description: 'print the current UTC time' },
   { command: 'clear', description: 'clear the terminal output' },
 ];
@@ -63,6 +65,7 @@ const COMMANDS = [
   'echo',
   'exit',
   'fastfetch',
+  'git',
   'github',
   'help',
   'history',
@@ -70,13 +73,40 @@ const COMMANDS = [
   'ls',
   'man',
   'neofetch',
+  'now',
   'open',
   'pwd',
+  'status',
   'theme',
   'tree',
   'uname',
   'whoami',
 ];
+
+const OPEN_TARGETS = {
+  github: {
+    href: 'https://github.com/v01dF0rg3',
+    label: 'opening github.com/v01dF0rg3',
+  },
+  'session-sentinel': {
+    href: 'https://github.com/v01dF0rg3/session-sentinel',
+    label: 'opening github.com/v01dF0rg3/session-sentinel',
+  },
+  profile: {
+    href: 'https://github.com/v01dF0rg3/v01dF0rg3',
+    label: 'opening the profile README source',
+  },
+  feed: {
+    href: 'https://v01df0rg3.github.io/feed.xml',
+    label: 'opening the RSS feed',
+  },
+} as const;
+
+const VIRTUAL_GIT_LOG = [
+  'HEAD     Add public project listings and build notes',
+  'HEAD~1   Simplify the animated ASCII black hole display',
+  'HEAD~2   Build the terminal portfolio foundation',
+].join('\n');
 
 const INITIAL_TRANSCRIPT: TranscriptEntry[] = [
   {
@@ -206,7 +236,11 @@ function landingFor(path: string): OutputBlock[] {
   if (path === HOME) {
     return [
       { kind: 'text', text: files[HOME + '/about.txt'].content },
-      { kind: 'text', text: 'Try: ls   or   cd projects', tone: 'muted' },
+      {
+        kind: 'text',
+        text: 'Try:\n  ls\n  cd projects\n  cat session-sentinel.md',
+        tone: 'muted',
+      },
     ];
   }
 
@@ -713,6 +747,8 @@ export default function Home() {
       blocks.push({ kind: 'text', text: cwd });
     } else if (command === 'whoami') {
       blocks.push({ kind: 'text', text: 'v01df0rg3', tone: 'success' });
+    } else if (command === 'now' || command === 'status') {
+      blocks.push(readFile(files[HOME + '/now.txt']));
     } else if (command === 'id') {
       blocks.push({
         kind: 'text',
@@ -736,6 +772,16 @@ export default function Home() {
           .map((entry, index) => String(index + 1).padStart(4, ' ') + '  ' + entry)
           .join('\n'),
       });
+    } else if (command === 'git') {
+      if (args[0] === 'log') {
+        blocks.push({ kind: 'text', text: VIRTUAL_GIT_LOG });
+      } else {
+        blocks.push({
+          kind: 'text',
+          text: 'git: supported command: log',
+          tone: 'error',
+        });
+      }
     } else if (command === 'fastfetch' || command === 'neofetch') {
       blocks.push({ kind: 'fastfetch' });
     } else if (command === 'ls') {
@@ -855,18 +901,19 @@ export default function Home() {
         });
       }
     } else if (command === 'open' || command === 'github') {
-      const target = command === 'github' ? 'github' : args[0]?.toLowerCase();
-      if (target === 'github') {
-        const href = 'https://github.com/v01dF0rg3';
+      const target = command === 'github' ? 'github' : args.join(' ').toLowerCase();
+      const destination = OPEN_TARGETS[target as keyof typeof OPEN_TARGETS];
+      if (destination) {
+        const { href, label } = destination;
         const opened = window.open(href, '_blank', 'noopener,noreferrer');
         if (opened) {
           opened.opener = null;
         }
-        blocks.push({ kind: 'link', href, label: 'opening github.com/v01dF0rg3' });
+        blocks.push({ kind: 'link', href, label });
       } else {
         blocks.push({
           kind: 'text',
-          text: 'open: available target: github',
+          text: 'open: available targets: github, session-sentinel, profile, feed',
           tone: 'error',
         });
       }
@@ -923,6 +970,20 @@ export default function Home() {
     }
 
     const activeCommand = pieces[0];
+    if (activeCommand === 'open') {
+      const matches = Object.keys(OPEN_TARGETS).filter((target) =>
+        target.startsWith(finalPiece.toLowerCase()),
+      );
+      if (matches.length === 1) {
+        setInput(input.slice(0, input.length - finalPiece.length) + matches[0]);
+      } else if (matches.length > 1) {
+        appendEntry(cwd, undefined, [
+          { kind: 'text', text: matches.join('   '), tone: 'muted' },
+        ]);
+      }
+      return;
+    }
+
     const childNames = directories[cwd]?.children ?? [];
     const matches = childNames.filter((name) => {
       if (activeCommand === 'cd' && !name.endsWith('/')) {
@@ -1008,6 +1069,10 @@ export default function Home() {
           <p>Welcome to the terminal.</p>
           <p className="output--muted">
             Type <span className="accent">help</span> to see available commands.
+          </p>
+          <p className="output--muted">
+            Start with <span className="accent">ls</span>, then explore{' '}
+            <span className="accent">cd projects</span>.
           </p>
         </div>
       );
@@ -1144,11 +1209,13 @@ export default function Home() {
       </section>
 
       <nav className="quick-commands" aria-label="Quick terminal commands">
-        {['help', 'ls', 'cd ..', 'clear', 'fastfetch'].map((command) => (
-          <button key={command} type="button" onClick={() => runCommand(command)}>
-            {command}
-          </button>
-        ))}
+        {['help', 'ls', 'cd projects', 'cat session-sentinel.md', 'now', 'clear'].map(
+          (command) => (
+            <button key={command} type="button" onClick={() => runCommand(command)}>
+              {command}
+            </button>
+          ),
+        )}
       </nav>
     </main>
   );

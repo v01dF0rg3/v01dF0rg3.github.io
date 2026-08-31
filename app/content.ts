@@ -1,6 +1,9 @@
 import about from '../content/about.txt?raw';
 import contact from '../content/contact.txt?raw';
+import now from '../content/now.txt?raw';
 import bootSequence from '../content/blog/boot-sequence.md?raw';
+import sessionSentinelBuildLog from '../content/blog/session-sentinel-build-log.md?raw';
+import terminalInterface from '../content/blog/terminal-interface.md?raw';
 import sessionSentinel from '../content/projects/session-sentinel.md?raw';
 import terminalPortfolio from '../content/projects/terminal-portfolio.md?raw';
 
@@ -25,7 +28,7 @@ export const directories: Record<string, DirectoryEntry> = {
   '/home': { type: 'directory', children: ['v01df0rg3/'] },
   [HOME]: {
     type: 'directory',
-    children: ['about.txt', 'projects/', 'blog/', 'contact.txt', 'links/'],
+    children: ['about.txt', 'now.txt', 'projects/', 'blog/', 'contact.txt', 'links/'],
   },
   [`${HOME}/projects`]: {
     type: 'directory',
@@ -33,11 +36,16 @@ export const directories: Record<string, DirectoryEntry> = {
   },
   [`${HOME}/blog`]: {
     type: 'directory',
-    children: ['README.md', 'boot-sequence.md'],
+    children: [
+      'README.md',
+      'boot-sequence.md',
+      'session-sentinel-build-log.md',
+      'terminal-interface.md',
+    ],
   },
   [`${HOME}/links`]: {
     type: 'directory',
-    children: ['github.url', 'profile-readme.url'],
+    children: ['feed.url', 'github.url', 'profile-readme.url'],
   },
 };
 
@@ -53,6 +61,12 @@ export const files: Record<string, FileEntry> = {
     format: 'text',
     content: contact,
     description: 'public contact route',
+  },
+  [`${HOME}/now.txt`]: {
+    type: 'file',
+    format: 'text',
+    content: now,
+    description: 'current focus and next steps',
   },
   [`${HOME}/projects/README.md`]: {
     type: 'file',
@@ -77,7 +91,7 @@ export const files: Record<string, FileEntry> = {
     type: 'file',
     format: 'markdown',
     content:
-      '# blog\n\nNotes are stored as Markdown files.\n\nUse `cat <post>.md` to read one.',
+      '# blog\n\nNotes are stored as Markdown files.\n\n- `session-sentinel-build-log.md` — building an honest logout tool\n- `terminal-interface.md` — why this portfolio behaves like a shell\n- `boot-sequence.md` — the first entry\n\nUse `cat <post>.md` to read one.\n\nThe feed is linked at `links/feed.url`.',
     description: 'blog directory guide',
   },
   [`${HOME}/blog/boot-sequence.md`]: {
@@ -85,6 +99,18 @@ export const files: Record<string, FileEntry> = {
     format: 'markdown',
     content: bootSequence,
     description: 'the first entry',
+  },
+  [`${HOME}/blog/session-sentinel-build-log.md`]: {
+    type: 'file',
+    format: 'markdown',
+    content: sessionSentinelBuildLog,
+    description: 'building an honest logout tool',
+  },
+  [`${HOME}/blog/terminal-interface.md`]: {
+    type: 'file',
+    format: 'markdown',
+    content: terminalInterface,
+    description: 'why this portfolio behaves like a shell',
   },
   [`${HOME}/links/github.url`]: {
     type: 'file',
@@ -97,5 +123,11 @@ export const files: Record<string, FileEntry> = {
     format: 'link',
     content: 'https://github.com/v01dF0rg3/v01dF0rg3',
     description: 'profile README source',
+  },
+  [`${HOME}/links/feed.url`]: {
+    type: 'file',
+    format: 'link',
+    content: 'https://v01df0rg3.github.io/feed.xml',
+    description: 'RSS feed for blog notes',
   },
 };
