@@ -1,6 +1,9 @@
 import about from '../content/about.txt?raw';
 import contact from '../content/contact.txt?raw';
 import now from '../content/now.txt?raw';
+import userFlag from '../content/user.txt?raw';
+import hiddenHash from '../content/.hash?raw';
+import rootFlag from '../content/root.txt?raw';
 import bootSequence from '../content/blog/boot-sequence.md?raw';
 import sessionSentinelBuildLog from '../content/blog/session-sentinel-build-log.md?raw';
 import terminalInterface from '../content/blog/terminal-interface.md?raw';
@@ -8,6 +11,7 @@ import sessionSentinel from '../content/projects/session-sentinel.md?raw';
 import terminalPortfolio from '../content/projects/terminal-portfolio.md?raw';
 
 export const HOME = '/home/v01df0rg3';
+export const ROOT = '/root';
 
 export type FileFormat = 'text' | 'markdown' | 'link';
 
@@ -24,11 +28,20 @@ export type DirectoryEntry = {
 };
 
 export const directories: Record<string, DirectoryEntry> = {
-  '/': { type: 'directory', children: ['home/'] },
+  '/': { type: 'directory', children: ['home/', 'root/'] },
   '/home': { type: 'directory', children: ['v01df0rg3/'] },
   [HOME]: {
     type: 'directory',
-    children: ['about.txt', 'now.txt', 'projects/', 'blog/', 'contact.txt', 'links/'],
+    children: [
+      'about.txt',
+      'now.txt',
+      'projects/',
+      'blog/',
+      'contact.txt',
+      'links/',
+      'user.txt',
+      '.hash',
+    ],
   },
   [`${HOME}/projects`]: {
     type: 'directory',
@@ -46,6 +59,10 @@ export const directories: Record<string, DirectoryEntry> = {
   [`${HOME}/links`]: {
     type: 'directory',
     children: ['feed.url', 'github.url', 'profile-readme.url'],
+  },
+  [ROOT]: {
+    type: 'directory',
+    children: ['root.txt'],
   },
 };
 
@@ -67,6 +84,18 @@ export const files: Record<string, FileEntry> = {
     format: 'text',
     content: now,
     description: 'current focus and next steps',
+  },
+  [`${HOME}/user.txt`]: {
+    type: 'file',
+    format: 'text',
+    content: userFlag,
+    description: 'user flag and a hidden-machine clue',
+  },
+  [`${HOME}/.hash`]: {
+    type: 'file',
+    format: 'text',
+    content: hiddenHash,
+    description: 'hidden MD5 challenge hash',
   },
   [`${HOME}/projects/README.md`]: {
     type: 'file',
@@ -129,5 +158,11 @@ export const files: Record<string, FileEntry> = {
     format: 'link',
     content: 'https://v01df0rg3.github.io/feed.xml',
     description: 'RSS feed for blog notes',
+  },
+  [`${ROOT}/root.txt`]: {
+    type: 'file',
+    format: 'text',
+    content: rootFlag,
+    description: 'root flag and congratulations',
   },
 };

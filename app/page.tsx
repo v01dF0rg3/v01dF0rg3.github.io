@@ -9,7 +9,9 @@ import {
   type KeyboardEvent,
   type MouseEvent,
 } from 'react';
-import { HOME, directories, files, type FileEntry } from './content';
+import { HOME, ROOT, directories, files, type FileEntry } from './content';
+
+type TerminalUser = 'v01df0rg3' | 'root';
 
 type HelpEntry = {
   command: string;
@@ -35,6 +37,7 @@ type OutputBlock =
 type TranscriptEntry = {
   id: number;
   cwd: string;
+  user: TerminalUser;
   input?: string;
   blocks: OutputBlock[];
 };
@@ -52,6 +55,7 @@ const COMMAND_HELP: HelpEntry[] = [
   { command: 'history', description: 'show commands from this session' },
   { command: 'git log', description: 'show the local build history' },
   { command: 'open <target>', description: 'open a public link' },
+  { command: 'su root', description: 'enter the simulated root challenge' },
   { command: 'date', description: 'print the current UTC time' },
   { command: 'clear', description: 'clear the terminal output' },
 ];
@@ -77,6 +81,7 @@ const COMMANDS = [
   'open',
   'pwd',
   'status',
+  'su',
   'theme',
   'tree',
   'uname',
@@ -114,6 +119,7 @@ const TERMINAL_AUDIO_MAX_VOLUME_PERCENT = 25;
 const TERMINAL_AUDIO_CROSSFADE_SECONDS = 0.06;
 const TERMINAL_AUDIO_MUTED_PREFERENCE = 'v01df0rg3-terminal-audio-muted';
 const TERMINAL_AUDIO_VOLUME_PREFERENCE = 'v01df0rg3-terminal-audio-volume';
+const ROOT_PASSWORD = 'sunshine1';
 
 function trimAudioPadding(buffer: AudioBuffer, context: BaseAudioContext) {
   const threshold = 0.0005;
@@ -205,12 +211,14 @@ const INITIAL_TRANSCRIPT: TranscriptEntry[] = [
   {
     id: 0,
     cwd: HOME,
+    user: 'v01df0rg3',
     input: 'fastfetch',
     blocks: [{ kind: 'fastfetch' }],
   },
   {
     id: 1,
     cwd: HOME,
+    user: 'v01df0rg3',
     blocks: [{ kind: 'welcome' }],
   },
 ];
@@ -277,6 +285,25 @@ function normalizePath(rawPath: string, cwd: string) {
   return '/' + segments.join('/');
 }
 
+function isProtectedPath(path: string) {
+  return path === ROOT || path.startsWith(ROOT + '/');
+}
+
+function childrenFor(path: string, isRoot: boolean) {
+  const directory = directories[path];
+  if (!directory) {
+    return [];
+  }
+
+  return directory.children.filter((name) => {
+    if (isRoot) {
+      return true;
+    }
+    const childPath = normalizePath(name.replace(/\/$/, ''), path);
+    return !isProtectedPath(childPath);
+  });
+}
+
 function parentPath(path: string) {
   if (path === '/') {
     return '/';
@@ -300,9 +327,17 @@ function basename(path: string) {
   return path.split('/').filter(Boolean).at(-1) ?? '/';
 }
 
-function listingFor(path: string, long = false, showAll = false): OutputBlock {
+function listingFor(
+  path: string,
+  long = false,
+  showAll = false,
+  isRoot = false,
+): OutputBlock {
   const directory = directories[path];
-  const names = showAll ? ['.', '..', ...directory.children] : directory.children;
+  const childNames = childrenFor(path, isRoot);
+  const names = showAll
+    ? ['.', '..', ...childNames]
+    : childNames.filter((name) => !name.startsWith('.'));
   const items = names.map((name) => {
     const isSpecial = name === '.' || name === '..';
     const isDirectory = isSpecial || name.endsWith('/');
@@ -325,13 +360,13 @@ function listingFor(path: string, long = false, showAll = false): OutputBlock {
   return { kind: 'listing', items, long };
 }
 
-function landingFor(path: string): OutputBlock[] {
+function landingFor(path: string, isRoot = false): OutputBlock[] {
   if (path === HOME) {
     return [
       { kind: 'text', text: files[HOME + '/about.txt'].content },
       {
         kind: 'text',
-        text: 'Try:\n  ls\n  cd projects\n  cat session-sentinel.md',
+        text: 'Try:\n  ls\n  cd projects\n  cat session-sentinel.md\n  cat user.txt',
         tone: 'muted',
       },
     ];
@@ -340,25 +375,25 @@ function landingFor(path: string): OutputBlock[] {
   if (path === HOME + '/projects') {
     return [
       { kind: 'markdown', source: files[path + '/README.md'].content },
-      listingFor(path),
+      listingFor(path, false, false, isRoot),
     ];
   }
 
   if (path === HOME + '/blog') {
     return [
       { kind: 'markdown', source: files[path + '/README.md'].content },
-      listingFor(path),
+      listingFor(path, false, false, isRoot),
     ];
   }
 
-  return [listingFor(path)];
+  return [listingFor(path, false, false, isRoot)];
 }
 
-function treeFor(path: string) {
+function treeFor(path: string, isRoot = false) {
   const lines = [basename(path)];
 
   function visit(directoryPath: string, prefix: string) {
-    const children = directories[directoryPath]?.children ?? [];
+    const children = childrenFor(directoryPath, isRoot);
     children.forEach((name, index) => {
       const last = index === children.length - 1;
       const cleanName = name.replace(/\/$/, '');
@@ -525,12 +560,12 @@ function MarkdownOutput({ source }: { source: string }) {
   return <div className="markdown-output">{blocks}</div>;
 }
 
-function Prompt({ cwd }: { cwd: string }) {
+function Prompt({ cwd, user }: { cwd: string; user: TerminalUser }) {
   return (
     <>
-      <span className="prompt-user">v01df0rg3@void</span>
+      <span className="prompt-user">{user}@void</span>
       <span className="prompt-path">{displayPath(cwd)}</span>
-      <span className="prompt-symbol">%</span>
+      <span className="prompt-symbol">{user === 'root' ? '#' : '%'}</span>
     </>
   );
 }
@@ -672,12 +707,12 @@ function AsciiBlackHole() {
   );
 }
 
-function Fastfetch({ uptime }: { uptime: string }) {
+function Fastfetch({ uptime, user }: { uptime: string; user: TerminalUser }) {
   return (
     <div className="fastfetch">
       <AsciiBlackHole />
       <div className="fastfetch__details">
-        <p className="fastfetch__title">v01df0rg3@void</p>
+        <p className="fastfetch__title">{user}@void</p>
         <p>
           <b>OS</b>
           <span>Void Web</span>
@@ -722,6 +757,8 @@ function Fastfetch({ uptime }: { uptime: string }) {
 export default function Home() {
   const [cwd, setCwd] = useState(HOME);
   const [previousDirectory, setPreviousDirectory] = useState(HOME);
+  const [isRoot, setIsRoot] = useState(false);
+  const [pendingAuth, setPendingAuth] = useState<TerminalUser | null>(null);
   const [input, setInput] = useState('');
   const [transcript, setTranscript] =
     useState<TranscriptEntry[]>(INITIAL_TRANSCRIPT);
@@ -745,6 +782,7 @@ export default function Home() {
   const endRef = useRef<HTMLDivElement>(null);
   const nextId = useRef(2);
   const sessionStart = useRef(Date.now());
+  const currentUser: TerminalUser = isRoot ? 'root' : 'v01df0rg3';
 
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -901,7 +939,7 @@ export default function Home() {
 
     const syncRoute = () => {
       const nextPath = decodeURIComponent(window.location.hash.slice(1));
-      if (directories[nextPath]) {
+      if (directories[nextPath] && !isProtectedPath(nextPath)) {
         setCwd(nextPath);
       }
     };
@@ -915,12 +953,18 @@ export default function Home() {
     };
   }, []);
 
-  function appendEntry(entryCwd: string, command: string | undefined, blocks: OutputBlock[]) {
+  function appendEntry(
+    entryCwd: string,
+    command: string | undefined,
+    blocks: OutputBlock[],
+    entryUser: TerminalUser = currentUser,
+  ) {
     setTranscript((current) => [
       ...current,
       {
         id: nextId.current++,
         cwd: entryCwd,
+        user: entryUser,
         input: command,
         blocks,
       },
@@ -942,7 +986,50 @@ export default function Home() {
     return { kind: 'text', text: file.content.trimEnd() };
   }
 
+  function authenticateRoot(password: string) {
+    if (pendingAuth !== 'root') {
+      return;
+    }
+
+    if (password !== ROOT_PASSWORD) {
+      appendEntry(cwd, undefined, [
+        { kind: 'text', text: 'su: Authentication failure', tone: 'error' },
+      ]);
+      return;
+    }
+
+    const previousCwd = cwd;
+    setPendingAuth(null);
+    setIsRoot(true);
+    setPreviousDirectory(previousCwd);
+    setCwd(ROOT);
+    updateRoute(ROOT);
+    appendEntry(
+      ROOT,
+      undefined,
+      [
+        { kind: 'text', text: 'Authentication successful.', tone: 'success' },
+        { kind: 'text', text: 'root shell unlocked.', tone: 'success' },
+        ...landingFor(ROOT, true),
+      ],
+      'root',
+    );
+  }
+
+  function cancelRootLogin() {
+    setPendingAuth(null);
+    setInput('');
+    appendEntry(cwd, undefined, [
+      { kind: 'text', text: 'su: authentication cancelled', tone: 'muted' },
+    ]);
+  }
+
   function runCommand(rawCommand: string) {
+    if (pendingAuth) {
+      authenticateRoot(rawCommand.trim());
+      return;
+    }
+
     const commandText = rawCommand.trim();
     if (!commandText) {
       appendEntry(cwd, '', []);
@@ -989,13 +1076,15 @@ export default function Home() {
     } else if (command === 'pwd') {
       blocks.push({ kind: 'text', text: cwd });
     } else if (command === 'whoami') {
-      blocks.push({ kind: 'text', text: 'v01df0rg3', tone: 'success' });
+      blocks.push({ kind: 'text', text: currentUser, tone: 'success' });
     } else if (command === 'now' || command === 'status') {
       blocks.push(readFile(files[HOME + '/now.txt']));
     } else if (command === 'id') {
       blocks.push({
         kind: 'text',
-        text: 'uid=1000(v01df0rg3) gid=1000(v01df0rg3) groups=1000(v01df0rg3)',
+        text: isRoot
+          ? 'uid=0(root) gid=0(root) groups=0(root)'
+          : 'uid=1000(v01df0rg3) gid=1000(v01df0rg3) groups=1000(v01df0rg3)',
       });
     } else if (command === 'uname') {
       blocks.push({ kind: 'text', text: 'VoidWeb 1.0 static github-pages' });
@@ -1048,9 +1137,17 @@ export default function Home() {
         const target = normalizePath(pathArgs[0] ?? '.', cwd);
         const directory = directories[target];
         const file = files[target];
-        if (directory) {
+        if (!isRoot && isProtectedPath(target)) {
+          blocks.push({
+            kind: 'text',
+            text: 'ls: permission denied: ' + (pathArgs[0] ?? target),
+            tone: 'error',
+          });
+        } else if (directory) {
           const flags = flagArgs.join('');
-          blocks.push(listingFor(target, flags.includes('l'), flags.includes('a')));
+          blocks.push(
+            listingFor(target, flags.includes('l'), flags.includes('a'), isRoot),
+          );
         } else if (file) {
           blocks.push({
             kind: 'listing',
@@ -1080,11 +1177,17 @@ export default function Home() {
           args[0] === '-'
             ? previousDirectory
             : normalizePath(args[0] ?? HOME, cwd);
-        if (directories[target]) {
+        if (!isRoot && isProtectedPath(target)) {
+          blocks.push({
+            kind: 'text',
+            text: 'cd: permission denied: ' + (args[0] ?? target),
+            tone: 'error',
+          });
+        } else if (directories[target]) {
           setPreviousDirectory(cwd);
           setCwd(target);
           updateRoute(target);
-          blocks.push(...landingFor(target));
+          blocks.push(...landingFor(target, isRoot));
         } else if (files[target]) {
           blocks.push({
             kind: 'text',
@@ -1113,7 +1216,13 @@ export default function Home() {
               tone: 'muted',
             });
           }
-          if (file) {
+          if (!isRoot && isProtectedPath(target)) {
+            blocks.push({
+              kind: 'text',
+              text: 'cat: permission denied: ' + arg,
+              tone: 'error',
+            });
+          } else if (file) {
             blocks.push(readFile(file));
           } else if (directories[target]) {
             blocks.push({
@@ -1132,8 +1241,14 @@ export default function Home() {
       }
     } else if (command === 'tree') {
       const target = normalizePath(args[0] ?? '.', cwd);
-      if (directories[target]) {
-        blocks.push({ kind: 'text', text: treeFor(target) });
+      if (!isRoot && isProtectedPath(target)) {
+        blocks.push({
+          kind: 'text',
+          text: 'tree: permission denied: ' + (args[0] ?? target),
+          tone: 'error',
+        });
+      } else if (directories[target]) {
+        blocks.push({ kind: 'text', text: treeFor(target, isRoot) });
       } else if (files[target]) {
         blocks.push({ kind: 'text', text: basename(target) });
       } else {
@@ -1157,6 +1272,21 @@ export default function Home() {
         blocks.push({
           kind: 'text',
           text: 'open: available targets: github, session-sentinel, profile, feed',
+          tone: 'error',
+        });
+      }
+    } else if (command === 'su') {
+      if (args.length === 1 && args[0].toLowerCase() === 'root') {
+        if (isRoot) {
+          blocks.push({ kind: 'text', text: 'already root', tone: 'muted' });
+        } else {
+          blocks.push({ kind: 'text', text: 'Password:', tone: 'muted' });
+          setPendingAuth('root');
+        }
+      } else {
+        blocks.push({
+          kind: 'text',
+          text: 'su: usage: su root',
           tone: 'error',
         });
       }
@@ -1227,7 +1357,7 @@ export default function Home() {
       return;
     }
 
-    const childNames = directories[cwd]?.children ?? [];
+    const childNames = childrenFor(cwd, isRoot);
     const matches = childNames.filter((name) => {
       if (activeCommand === 'cd' && !name.endsWith('/')) {
         return false;
@@ -1248,6 +1378,14 @@ export default function Home() {
   }
 
   function handleKeyDown(event: KeyboardEvent<HTMLInputElement>) {
+    if (pendingAuth) {
+      if (event.key === 'Escape' || (event.key.toLowerCase() === 'c' && event.ctrlKey)) {
+        event.preventDefault();
+        cancelRootLogin();
+      }
+      return;
+    }
+
     if (event.key === 'ArrowUp') {
       event.preventDefault();
       if (!commandLog.length) {
@@ -1291,6 +1429,10 @@ export default function Home() {
     event.preventDefault();
     const command = input;
     setInput('');
+    if (pendingAuth) {
+      authenticateRoot(command.trim());
+      return;
+    }
     runCommand(command);
   }
 
@@ -1403,9 +1545,9 @@ export default function Home() {
     }
   }
 
-  function renderBlock(block: OutputBlock, key: string) {
+  function renderBlock(block: OutputBlock, key: string, user: TerminalUser) {
     if (block.kind === 'fastfetch') {
-      return <Fastfetch key={key} uptime={uptime} />;
+      return <Fastfetch key={key} uptime={uptime} user={user} />;
     }
 
     if (block.kind === 'welcome') {
@@ -1503,7 +1645,7 @@ export default function Home() {
       onClick={focusInput}
     >
       <header className="terminal__topline">
-        <span>v01df0rg3@void</span>
+        <span>{currentUser}@void</span>
         <div className="terminal__topline-right">
           <span>
             zsh-web <i className="online-dot" /> online
@@ -1550,26 +1692,31 @@ export default function Home() {
           <div className="transcript-entry" key={entry.id}>
             {entry.input !== undefined && (
               <div className="prompt-line">
-                <Prompt cwd={entry.cwd} />
+                <Prompt cwd={entry.cwd} user={entry.user} />
                 <span className="command-text">{entry.input}</span>
               </div>
             )}
             <div className="command-output">
               {entry.blocks.map((block, index) =>
-                renderBlock(block, entry.id + '-' + index),
+                renderBlock(block, entry.id + '-' + index, entry.user),
               )}
             </div>
           </div>
         ))}
 
         <form className="prompt-line prompt-line--active" onSubmit={submitCommand}>
-          <Prompt cwd={cwd} />
+          {pendingAuth ? (
+            <span className="password-prompt">Password:</span>
+          ) : (
+            <Prompt cwd={cwd} user={currentUser} />
+          )}
           <label className="sr-only" htmlFor="terminal-command">
             Terminal command
           </label>
           <input
             ref={inputRef}
             id="terminal-command"
+            type={pendingAuth ? 'password' : 'text'}
             value={input}
             onChange={(event) => {
               setInput(event.target.value);
@@ -1581,10 +1728,13 @@ export default function Home() {
             autoCorrect="off"
             spellCheck={false}
             aria-describedby="terminal-hint"
+            aria-label={pendingAuth ? 'Root password' : 'Terminal command'}
           />
         </form>
         <p className="sr-only" id="terminal-hint">
-          Type help for commands. Use the up and down arrow keys for command history.
+          {pendingAuth
+            ? 'Enter the root password. Press Escape to cancel.'
+            : 'Type help for commands. Use the up and down arrow keys for command history.'}
         </p>
         <div ref={endRef} />
       </section>
@@ -1592,7 +1742,12 @@ export default function Home() {
       <nav className="quick-commands" aria-label="Quick terminal commands">
         {['help', 'ls', 'cd projects', 'cat session-sentinel.md', 'now', 'clear'].map(
           (command) => (
-            <button key={command} type="button" onClick={() => runCommand(command)}>
+            <button
+              key={command}
+              type="button"
+              onClick={() => runCommand(command)}
+              disabled={pendingAuth !== null}
+            >
               {command}
             </button>
           ),

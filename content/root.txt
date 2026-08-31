@@ -1,0 +1,7 @@
+root access // granted
+--------------------
+
+FLAG{r00t_4cc3ss_gr4nt3d}
+
+congratulations, v01df0rg3.
+You found the hidden hash, recovered the password, and crossed the boundary.

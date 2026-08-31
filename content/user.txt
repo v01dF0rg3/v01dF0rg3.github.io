@@ -1,0 +1,10 @@
+user flag
+---------
+
+flag{v01df0rg3}
+
+The shell is only the surface.
+Look around the machine for something hidden.
+Try `ls -la`, then inspect anything unusual.
+
+Once you find a hash, crack it locally and use `su root`.
