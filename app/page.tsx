@@ -111,6 +111,7 @@ const VIRTUAL_GIT_LOG = [
 const TERMINAL_AUDIO_SRC = '/audio/terminal-loop.mp3';
 const TERMINAL_AUDIO_DEFAULT_VOLUME_PERCENT = 12;
 const TERMINAL_AUDIO_MAX_VOLUME_PERCENT = 25;
+const TERMINAL_AUDIO_CROSSFADE_SECONDS = 0.2;
 const TERMINAL_AUDIO_MUTED_PREFERENCE = 'v01df0rg3-terminal-audio-muted';
 const TERMINAL_AUDIO_VOLUME_PREFERENCE = 'v01df0rg3-terminal-audio-volume';
 
@@ -162,6 +163,42 @@ function trimAudioPadding(buffer: AudioBuffer, context: BaseAudioContext) {
     );
   }
   return trimmed;
+}
+
+function prepareAudioLoop(buffer: AudioBuffer, context: BaseAudioContext) {
+  const trimmed = trimAudioPadding(buffer, context);
+  const overlap = Math.min(
+    Math.floor(trimmed.sampleRate * TERMINAL_AUDIO_CROSSFADE_SECONDS),
+    Math.floor(trimmed.length / 4),
+  );
+
+  if (overlap < 2) {
+    return trimmed;
+  }
+
+  const loop = context.createBuffer(
+    trimmed.numberOfChannels,
+    trimmed.length - overlap,
+    trimmed.sampleRate,
+  );
+
+  for (let channel = 0; channel < trimmed.numberOfChannels; channel += 1) {
+    const source = trimmed.getChannelData(channel);
+    const target = loop.getChannelData(channel);
+
+    for (let index = 0; index < overlap; index += 1) {
+      const progress = index / overlap;
+      const fadeOut = Math.cos(progress * Math.PI * 0.5);
+      const fadeIn = Math.sin(progress * Math.PI * 0.5);
+      target[index] =
+        source[trimmed.length - overlap + index] * fadeOut +
+        source[index] * fadeIn;
+    }
+
+    target.set(source.subarray(overlap, trimmed.length - overlap), overlap);
+  }
+
+  return loop;
 }
 
 const INITIAL_TRANSCRIPT: TranscriptEntry[] = [
@@ -828,7 +865,7 @@ export default function Home() {
         if (cancelled) {
           return;
         }
-        decodedBuffer = trimAudioPadding(decoded, context);
+        decodedBuffer = prepareAudioLoop(decoded, context);
         if (!isMutedRef.current) {
           void startPlayback();
         }
