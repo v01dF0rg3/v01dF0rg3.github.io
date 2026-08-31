@@ -14,6 +14,7 @@ Use Node.js 22 (the version used by the deployment workflow).
     npm run dev
 
 The development site runs at http://localhost:3000.
+Visit the live build at https://v01df0rg3.github.io/
 
 ## Content
 
