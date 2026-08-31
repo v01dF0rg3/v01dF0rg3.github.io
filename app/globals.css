@@ -243,36 +243,6 @@ a {
   user-select: none;
 }
 
-.ascii-black-hole figcaption {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 0.25rem 1rem;
-  margin-top: 0.5rem;
-  color: #506158;
-  font-size: 0.68rem;
-  letter-spacing: 0.06em;
-  text-align: center;
-  text-transform: uppercase;
-}
-
-.ascii-black-hole figcaption button {
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: var(--green);
-  cursor: pointer;
-  text-transform: uppercase;
-}
-
-.ascii-black-hole figcaption button:hover,
-.ascii-black-hole figcaption button:focus-visible {
-  color: var(--cyan);
-  outline: 0;
-  text-decoration: underline;
-  text-underline-offset: 0.25em;
-}
-
 .fastfetch__details {
   min-width: 0;
 }

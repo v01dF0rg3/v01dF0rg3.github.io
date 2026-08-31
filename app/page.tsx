@@ -410,7 +410,6 @@ function Prompt({ cwd }: { cwd: string }) {
 
 function AsciiBlackHole() {
   const frameRef = useRef<HTMLPreElement>(null);
-  const [paused, setPaused] = useState(false);
 
   useEffect(() => {
     const columns = 54;
@@ -528,15 +527,11 @@ function AsciiBlackHole() {
       }
     }
 
-    if (paused) {
-      draw(startedAt + 1800);
-    } else {
-      draw(startedAt);
-      animationTimer = window.setInterval(() => draw(performance.now()), 72);
-    }
+    draw(startedAt);
+    animationTimer = window.setInterval(() => draw(performance.now()), 72);
 
     return () => window.clearInterval(animationTimer);
-  }, [paused]);
+  }, []);
 
   return (
     <figure className="ascii-black-hole">
@@ -546,16 +541,6 @@ function AsciiBlackHole() {
       >
         {STATIC_BLACK_HOLE}
       </pre>
-      <figcaption>
-        <span>ascii gravity well // render active</span>
-        <button
-          type="button"
-          aria-pressed={paused}
-          onClick={() => setPaused((current) => !current)}
-        >
-          {paused ? '[animation: paused]' : '[animation: running]'}
-        </button>
-      </figcaption>
     </figure>
   );
 }
